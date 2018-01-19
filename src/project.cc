@@ -29,6 +29,10 @@ namespace {
 
 bool g_disable_normalize_path_for_test = false;
 
+bool IsHeaderMap(const std::string& path) {
+  return EndsWith(path, ".hmap");
+}
+
 std::string NormalizePathWithTestOptOut(const std::string& path) {
   if (g_disable_normalize_path_for_test) {
     // Add a & so we can test to verify a path is normalized.
@@ -53,6 +57,7 @@ bool IsWindowsAbsolutePath(const std::string& path) {
 struct ProjectConfig {
   std::unordered_set<std::string> quote_dirs;
   std::unordered_set<std::string> angle_dirs;
+  std::unordered_set<std::string> header_maps;
   std::vector<std::string> extra_flags;
   std::string project_dir;
   std::string resource_dir;
@@ -88,7 +93,7 @@ std::vector<std::string> kAngleIncludeArgs = {"-I", "-isystem"};
 bool ShouldAddToQuoteIncludes(const std::string& arg) {
   return StartsWithAny(arg, kQuoteIncludeArgs);
 }
-bool ShouldAddToAngleIncludes(const std::string& arg) {
+bool ShouldAddToAngleIncludesOrHeaderMaps(const std::string& arg) {
   return StartsWithAny(arg, kAngleIncludeArgs);
 }
 
@@ -178,7 +183,7 @@ Project::Entry GetCompilationEntryFromCompileCommandEntry(
 
   bool next_flag_is_path = false;
   bool add_next_flag_to_quote_dirs = false;
-  bool add_next_flag_to_angle_dirs = false;
+  bool add_next_flag_to_angle_dirs_or_header_maps = false;
 
   // Note that when processing paths, some arguments support multiple forms, ie,
   // {"-Ifoo"} or {"-I", "foo"}.  Support both styles.
@@ -203,12 +208,18 @@ Project::Entry GetCompilationEntryFromCompileCommandEntry(
       std::string normalized_arg = cleanup_maybe_relative_path(arg);
       if (add_next_flag_to_quote_dirs)
         config->quote_dirs.insert(normalized_arg);
-      if (add_next_flag_to_angle_dirs)
-        config->angle_dirs.insert(normalized_arg);
+      if (add_next_flag_to_angle_dirs_or_header_maps){
+        if (IsHeaderMap(normalized_arg)) {
+          LOG_S(INFO) << "got header map " << normalized_arg;
+          config->header_maps.insert(normalized_arg);
+        }
+        else
+          config->angle_dirs.insert(normalized_arg);
+      }
 
       next_flag_is_path = false;
       add_next_flag_to_quote_dirs = false;
-      add_next_flag_to_angle_dirs = false;
+      add_next_flag_to_angle_dirs_or_header_maps = false;
     }
 
     else {
@@ -218,7 +229,8 @@ Project::Entry GetCompilationEntryFromCompileCommandEntry(
         if (arg == flag_type) {
           next_flag_is_path = true;
           add_next_flag_to_quote_dirs = ShouldAddToQuoteIncludes(arg);
-          add_next_flag_to_angle_dirs = ShouldAddToAngleIncludes(arg);
+          add_next_flag_to_angle_dirs_or_header_maps =
+              ShouldAddToAngleIncludesOrHeaderMaps(arg);
           break;
         }
 
@@ -231,7 +243,7 @@ Project::Entry GetCompilationEntryFromCompileCommandEntry(
             arg = flag_type + path;
           if (ShouldAddToQuoteIncludes(flag_type))
             config->quote_dirs.insert(path);
-          if (ShouldAddToAngleIncludes(flag_type))
+          if (ShouldAddToAngleIncludesOrHeaderMaps(flag_type))
             config->angle_dirs.insert(path);
           break;
         }
@@ -443,6 +455,7 @@ void Project::Load(Config* init_opts,
                                    config.quote_dirs.end());
   angle_include_directories.assign(config.angle_dirs.begin(),
                                    config.angle_dirs.end());
+  header_maps.assign(config.header_maps.begin(), config.header_maps.end());
   for (std::string& path : quote_include_directories) {
     EnsureEndsInSlash(path);
     LOG_S(INFO) << "quote_include_dir: " << path;
@@ -450,6 +463,9 @@ void Project::Load(Config* init_opts,
   for (std::string& path : angle_include_directories) {
     EnsureEndsInSlash(path);
     LOG_S(INFO) << "angle_include_dir: " << path;
+  }
+  for (std::string& path : header_maps) {
+    LOG_S(INFO) << "header_map: " << path;
   }
 
   // Setup project entries.

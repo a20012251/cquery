@@ -22,6 +22,7 @@ struct IncludeComplete {
   // blocking function and should be run off the querydb thread.
   void InsertIncludesFromDirectory(std::string directory,
                                    bool use_angle_brackets);
+  void InsertIncludesFromHeaderMap(std::string header_map);
   void InsertStlIncludes();
 
   optional<lsCompletionItem> FindCompletionItemForAbsolutePath(

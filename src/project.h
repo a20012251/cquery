@@ -22,6 +22,8 @@ struct Project {
   std::vector<std::string> quote_include_directories;
   // Include directories for <> headers
   std::vector<std::string> angle_include_directories;
+  // Included header maps
+  std::vector<std::string> header_maps;
 
   std::vector<Entry> entries;
   spp::sparse_hash_map<std::string, int> absolute_path_to_entry_index_;

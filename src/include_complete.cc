@@ -1,3 +1,4 @@
+#include "header_map.h"
 #include "include_complete.h"
 
 #include "match.h"
@@ -6,6 +7,8 @@
 #include "standard_includes.h"
 #include "timer.h"
 #include "work_thread.h"
+
+#include <loguru.hpp>
 
 #include <thread>
 
@@ -133,6 +136,8 @@ void IncludeComplete::Rescan() {
       InsertIncludesFromDirectory(dir, false /*use_angle_brackets*/);
     for (const std::string& dir : project_->angle_include_directories)
       InsertIncludesFromDirectory(dir, true /*use_angle_brackets*/);
+    for (const std::string& path : project_->header_maps)
+      InsertIncludesFromHeaderMap(path);
 
     timer.ResetAndPrint("[perf] Scanning for includes");
     is_scanning = false;
@@ -163,6 +168,41 @@ void IncludeComplete::AddFile(const std::string& absolute_path) {
             .insert(std::make_pair(absolute_path, completion_items.size()))
             .second)
       completion_items.push_back(item);
+  }
+}
+
+void IncludeComplete::InsertIncludesFromHeaderMap(std::string header_map) {
+  header_map = NormalizePath(header_map);
+
+  optional<HeaderMap> hmap = HeaderMapParser(header_map).Parse();
+  if (hmap == nullopt) {
+    LOG_S(INFO) << "Invalid header map " << header_map;
+    return;
+  }
+
+  LOG_S(INFO) << "Parsing includes of header map " << header_map;
+
+  std::vector<CompletionCandidate> results;
+  for (const auto& entry : hmap->entries) {
+    std::string path = entry.prefix + entry.suffix;
+    if (match_ && !match_->IsMatch(path))
+      continue;
+    CompletionCandidate candidate;
+    candidate.absolute_path =  path;
+    candidate.completion_item = BuildCompletionItem(config_,
+                                                    path,
+                                                    true /*use_angle_brackets*/,
+                                                    false /*is_stl*/);
+    results.push_back(candidate);
+  }
+
+  std::lock_guard<std::mutex> lock(completion_items_mutex);
+  for (const CompletionCandidate& result : results) {
+    if (absolute_path_to_completion_item
+            .insert(
+                std::make_pair(result.absolute_path, completion_items.size()))
+            .second)
+      completion_items.push_back(result.completion_item);
   }
 }
 

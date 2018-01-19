@@ -200,3 +200,7 @@ std::string GetDefaultResourceDirectory();
 
 // Makes sure all newlines in |output| are in \r\n format.
 std::string UpdateToRnNewlines(std::string output);
+
+uint32_t ByteSwap32(uint32_t num);
+
+uint16_t ByteSwap16(uint16_t num);

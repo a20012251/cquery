@@ -583,6 +583,20 @@ std::string UpdateToRnNewlines(std::string output) {
   return output;
 };
 
+uint32_t ByteSwap32(uint32_t num) {
+  uint32_t b0 = num & 0x000000FF;
+  uint32_t b1 = num & 0x0000FF00;
+  uint32_t b2 = num & 0x00FF0000;
+  uint32_t b3 = num & 0xFF000000;
+  return (b0 << 24) | (b1 << 8) | (b2 >> 8) | (b3 >> 24);
+}
+
+uint16_t ByteSwap16(uint16_t num) {
+  uint16_t hi = num << 8;
+  uint16_t lo = num >> 8;
+  return hi | lo;
+}
+
 TEST_SUITE("ParseTestExpectation") {
   TEST_CASE("Parse TEXT_REPLACE") {
     // clang-format off
